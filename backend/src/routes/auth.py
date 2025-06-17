@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from lib.db import engine
-from lib.jwt import create_token
+from lib.jwt import create_token, verify_token
 import bcrypt
 import json
 
@@ -63,7 +63,7 @@ async def login(req:LoginUserSerializer):
             return JSONResponse({'Error':'Invalid Credentials'}, status_code=status.HTTP_401_UNAUTHORIZED)  
     #create jwt 
         user_json = json.loads(GetUserSerializer.model_validate(user).model_dump_json())
-        res = JSONResponse(user_json, status_code=status.HTTP_201_CREATED)
+        res = JSONResponse(user_json, status_code=status.HTTP_200_OK)
         access_token, refresh_token = create_token(user_json)
         res.set_cookie(key='jwt_access', value=access_token, secure=True, httponly=True, samesite='strict',max_age= 60 * 15)
         res.set_cookie(key='jwt_refresh', value=refresh_token, secure=True, httponly=True, samesite='strict', max_age= 7 * 24 * 60 * 60)
@@ -79,3 +79,19 @@ async def logout():
     return res
 
 #check
+@router.get('/check')
+async def checkAuth(req: Request):
+    try:
+        payload = verify_token(req)
+        if not payload:
+            return JSONResponse({'Error':'Unauthorized - No token payload'}, status_code=status.HTTP_401_UNAUTHORIZED)
+        access_token, refresh_token = create_token(payload)
+        res = JSONResponse({'Success':'Token verified!'}, status_code=status.HTTP_200_OK)
+        res.set_cookie(key='jwt_access', value=access_token, secure=True, httponly=True, samesite='strict',max_age= 60 * 15)
+        res.set_cookie(key='jwt_refresh', value=refresh_token, secure=True, httponly=True, samesite='strict', max_age= 7 * 24 * 60 * 60)
+        return res
+    except:
+        return JSONResponse({'Error':'Error on signing up user'}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    
